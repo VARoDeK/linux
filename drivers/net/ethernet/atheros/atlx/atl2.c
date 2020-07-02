@@ -1484,18 +1484,14 @@ static void atl2_remove(struct pci_dev *pdev)
 	pci_disable_device(pdev);
 }
 
-static int atl2_suspend(struct pci_dev *pdev, pm_message_t state)
+static int atl2_suspend(struct device *dev_d)
 {
-	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct net_device *netdev = dev_get_drvdata(dev_d);
 	struct atl2_adapter *adapter = netdev_priv(netdev);
 	struct atl2_hw *hw = &adapter->hw;
 	u16 speed, duplex;
 	u32 ctrl = 0;
 	u32 wufc = adapter->wol;
-
-#ifdef CONFIG_PM
-	int retval = 0;
-#endif
 
 	netif_device_detach(netdev);
 
@@ -1503,12 +1499,6 @@ static int atl2_suspend(struct pci_dev *pdev, pm_message_t state)
 		WARN_ON(test_bit(__ATL2_RESETTING, &adapter->flags));
 		atl2_down(adapter);
 	}
-
-#ifdef CONFIG_PM
-	retval = pci_save_state(pdev);
-	if (retval)
-		return retval;
-#endif
 
 	atl2_read_phy_reg(hw, MII_BMSR, (u16 *)&ctrl);
 	atl2_read_phy_reg(hw, MII_BMSR, (u16 *)&ctrl);
@@ -1560,7 +1550,7 @@ static int atl2_suspend(struct pci_dev *pdev, pm_message_t state)
 		ctrl |= PCIE_DLL_TX_CTRL1_SEL_NOR_CLK;
 		ATL2_WRITE_REG(hw, REG_PCIE_DLL_TX_CTRL1, ctrl);
 
-		pci_enable_wake(pdev, pci_choose_state(pdev, state), 1);
+		device_wakeup_enable(dev_d);
 		goto suspend_exit;
 	}
 
@@ -1580,7 +1570,7 @@ static int atl2_suspend(struct pci_dev *pdev, pm_message_t state)
 
 		hw->phy_configured = false; /* re-init PHY when resume */
 
-		pci_enable_wake(pdev, pci_choose_state(pdev, state), 1);
+		device_wakeup_enable(dev_d);
 
 		goto suspend_exit;
 	}
@@ -1600,42 +1590,26 @@ wol_dis:
 	atl2_force_ps(hw);
 	hw->phy_configured = false; /* re-init PHY when resume */
 
-	pci_enable_wake(pdev, pci_choose_state(pdev, state), 0);
+	device_wakeup_disable(dev_d);
 
 suspend_exit:
 	if (netif_running(netdev))
 		atl2_free_irq(adapter);
 
-	pci_disable_device(pdev);
-
-	pci_set_power_state(pdev, pci_choose_state(pdev, state));
-
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static int atl2_resume(struct pci_dev *pdev)
+static int __maybe_unused atl2_resume(struct device *dev_d)
 {
-	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct net_device *netdev = dev_get_drvdata(dev_d);
 	struct atl2_adapter *adapter = netdev_priv(netdev);
 	u32 err;
 
-	pci_set_power_state(pdev, PCI_D0);
-	pci_restore_state(pdev);
-
-	err = pci_enable_device(pdev);
-	if (err) {
-		printk(KERN_ERR
-			"atl2: Cannot enable PCI device from suspend\n");
-		return err;
-	}
-
-	pci_set_master(pdev);
+	pci_set_master(to_pci_dev(dev_d));
 
 	ATL2_READ_REG(&adapter->hw, REG_WOL_CTRL); /* clear WOL status */
 
-	pci_enable_wake(pdev, PCI_D3hot, 0);
-	pci_enable_wake(pdev, PCI_D3cold, 0);
+	device_wakeup_disable(dev_d);
 
 	ATL2_WRITE_REG(&adapter->hw, REG_WOL_CTRL, 0);
 
@@ -1654,24 +1628,22 @@ static int atl2_resume(struct pci_dev *pdev)
 
 	return 0;
 }
-#endif
 
 static void atl2_shutdown(struct pci_dev *pdev)
 {
-	atl2_suspend(pdev, PMSG_SUSPEND);
+	atl2_suspend(&pdev->dev);
 }
 
+static SIMPLE_DEV_PM_OPS(atl2_pm_ops, atl2_suspend, atl2_resume);
+
 static struct pci_driver atl2_driver = {
-	.name     = atl2_driver_name,
-	.id_table = atl2_pci_tbl,
-	.probe    = atl2_probe,
-	.remove   = atl2_remove,
+	.name      = atl2_driver_name,
+	.id_table  = atl2_pci_tbl,
+	.probe     = atl2_probe,
+	.remove    = atl2_remove,
 	/* Power Management Hooks */
-	.suspend  = atl2_suspend,
-#ifdef CONFIG_PM
-	.resume   = atl2_resume,
-#endif
-	.shutdown = atl2_shutdown,
+	.driver.pm = &atl2_pm_ops,
+	.shutdown  = atl2_shutdown,
 };
 
 /**
