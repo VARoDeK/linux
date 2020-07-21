@@ -909,10 +909,9 @@ typedef struct _x_config_parms {
  */
 extern int	 mpt_attach(struct pci_dev *pdev, const struct pci_device_id *id);
 extern void	 mpt_detach(struct pci_dev *pdev);
-#ifdef CONFIG_PM
-extern int	 mpt_suspend(struct pci_dev *pdev, pm_message_t state);
-extern int	 mpt_resume(struct pci_dev *pdev);
-#endif
+
+extern const struct dev_pm_ops mpt_pm_ops;
+
 extern u8	 mpt_register(MPT_CALLBACK cbfunc, MPT_DRIVER_CLASS dclass,
 		char *func_name);
 extern void	 mpt_deregister(u8 cb_idx);

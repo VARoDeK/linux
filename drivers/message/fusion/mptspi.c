@@ -1321,23 +1321,30 @@ mptspi_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 	return rc;
 }
 
-#ifdef CONFIG_PM
+/*
+ * spi module suspend handler
+ */
+static int __maybe_unused
+mptspi_suspend(struct device *dev)
+{
+	return mptscsih_pm_ops.suspend(dev);
+}
+
 /*
  * spi module resume handler
  */
-static int
-mptspi_resume(struct pci_dev *pdev)
+static int __maybe_unused
+mptspi_resume(struct device *dev)
 {
-	MPT_ADAPTER 	*ioc = pci_get_drvdata(pdev);
+	MPT_ADAPTER 	*ioc = dev_get_drvdata(dev);
 	struct _MPT_SCSI_HOST *hd = shost_priv(ioc->sh);
 	int rc;
 
-	rc = mptscsih_resume(pdev);
+	rc = mptscsih_pm_ops.resume(dev);
 	mptspi_dv_renegotiate(hd);
 
 	return rc;
 }
-#endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -1550,16 +1557,15 @@ static void mptspi_remove(struct pci_dev *pdev)
 	mptscsih_remove(pdev);
 }
 
+static SIMPLE_DEV_PM_OPS(mptspi_pm_ops, mptspi_suspend, mptspi_resume);
+
 static struct pci_driver mptspi_driver = {
 	.name		= "mptspi",
 	.id_table	= mptspi_pci_table,
 	.probe		= mptspi_probe,
 	.remove		= mptspi_remove,
 	.shutdown	= mptscsih_shutdown,
-#ifdef CONFIG_PM
-	.suspend	= mptscsih_suspend,
-	.resume		= mptspi_resume,
-#endif
+	.driver.pm	= &mptspi_pm_ops,
 };
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

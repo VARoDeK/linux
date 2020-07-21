@@ -107,10 +107,9 @@ typedef struct _internal_cmd {
 
 extern void mptscsih_remove(struct pci_dev *);
 extern void mptscsih_shutdown(struct pci_dev *);
-#ifdef CONFIG_PM
-extern int mptscsih_suspend(struct pci_dev *pdev, pm_message_t state);
-extern int mptscsih_resume(struct pci_dev *pdev);
-#endif
+
+extern const struct dev_pm_ops mptscsih_pm_ops;
+
 extern int mptscsih_show_info(struct seq_file *, struct Scsi_Host *);
 extern const char * mptscsih_info(struct Scsi_Host *SChost);
 extern int mptscsih_qcmd(struct scsi_cmnd *SCpnt);

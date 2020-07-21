@@ -2139,23 +2139,19 @@ mpt_detach(struct pci_dev *pdev)
 /**************************************************************************
  * Power Management
  */
-#ifdef CONFIG_PM
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mpt_suspend - Fusion MPT base driver suspend routine.
- *	@pdev: Pointer to pci_dev structure
- *	@state: new state to enter
+ *	@dev: Pointer to device structure
  */
-int
-mpt_suspend(struct pci_dev *pdev, pm_message_t state)
+static int __maybe_unused
+mpt_suspend(struct device *dev)
 {
-	u32 device_state;
+	struct pci_dev *pdev = to_pci_dev(dev);
 	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
 
-	device_state = pci_choose_state(pdev, state);
 	printk(MYIOC_s_INFO_FMT "pci-suspend: pdev=0x%p, slot=%s, Entering "
-	    "operating state [D%d]\n", ioc->name, pdev, pci_name(pdev),
-	    device_state);
+	    "suspend state\n", ioc->name, pdev, pci_name(pdev));
 
 	/* put ioc into READY_STATE */
 	if (SendIocReset(ioc, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, CAN_SLEEP)) {
@@ -2174,21 +2170,18 @@ mpt_suspend(struct pci_dev *pdev, pm_message_t state)
 	if (ioc->msi_enable)
 		pci_disable_msi(ioc->pcidev);
 	ioc->pci_irq = -1;
-	pci_save_state(pdev);
-	pci_disable_device(pdev);
-	pci_release_selected_regions(pdev, ioc->bars);
-	pci_set_power_state(pdev, device_state);
 	return 0;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mpt_resume - Fusion MPT base driver resume routine.
- *	@pdev: Pointer to pci_dev structure
+ *	@dev: Pointer to device structure
  */
-int
-mpt_resume(struct pci_dev *pdev)
+static int __maybe_unused
+mpt_resume(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
 	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
 	u32 device_state = pdev->current_state;
 	int recovery_state;
@@ -2198,9 +2191,6 @@ mpt_resume(struct pci_dev *pdev)
 	    "operating state [D%d]\n", ioc->name, pdev, pci_name(pdev),
 	    device_state);
 
-	pci_set_power_state(pdev, PCI_D0);
-	pci_enable_wake(pdev, PCI_D0, 0);
-	pci_restore_state(pdev);
 	ioc->pcidev = pdev;
 	err = mpt_mapresources(ioc);
 	if (err)
@@ -2256,7 +2246,9 @@ mpt_resume(struct pci_dev *pdev)
 	return 0;
 
 }
-#endif
+
+SIMPLE_DEV_PM_OPS(mpt_pm_ops, mpt_suspend, mpt_resume);
+EXPORT_SYMBOL(mpt_pm_ops);
 
 static int
 mpt_signal_reset(u8 index, MPT_ADAPTER *ioc, int reset_phase)
@@ -8440,10 +8432,6 @@ mpt_iocstatus_info(MPT_ADAPTER *ioc, u32 ioc_status, MPT_FRAME_HDR *mf)
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 EXPORT_SYMBOL(mpt_attach);
 EXPORT_SYMBOL(mpt_detach);
-#ifdef CONFIG_PM
-EXPORT_SYMBOL(mpt_resume);
-EXPORT_SYMBOL(mpt_suspend);
-#endif
 EXPORT_SYMBOL(ioc_list);
 EXPORT_SYMBOL(mpt_register);
 EXPORT_SYMBOL(mpt_deregister);

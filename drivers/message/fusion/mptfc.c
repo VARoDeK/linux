@@ -1357,10 +1357,7 @@ static struct pci_driver mptfc_driver = {
 	.probe		= mptfc_probe,
 	.remove		= mptfc_remove,
 	.shutdown	= mptscsih_shutdown,
-#ifdef CONFIG_PM
-	.suspend	= mptscsih_suspend,
-	.resume		= mptscsih_resume,
-#endif
+	.driver.pm	= &mptscsih_pm_ops,
 };
 
 static int

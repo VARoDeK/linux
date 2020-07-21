@@ -113,10 +113,12 @@ mptscsih_taskmgmt_reply(MPT_ADAPTER *ioc, u8 type,
 				SCSITaskMgmtReply_t *pScsiTmReply);
 void 		mptscsih_remove(struct pci_dev *);
 void 		mptscsih_shutdown(struct pci_dev *);
-#ifdef CONFIG_PM
-int 		mptscsih_suspend(struct pci_dev *pdev, pm_message_t state);
-int 		mptscsih_resume(struct pci_dev *pdev);
-#endif
+
+static int __maybe_unused
+mptscsih_suspend(struct device *dev);
+
+static int __maybe_unused
+mptscsih_resume(struct device *dev);
 
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -1215,22 +1217,21 @@ mptscsih_shutdown(struct pci_dev *pdev)
 {
 }
 
-#ifdef CONFIG_PM
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
  *	mptscsih_suspend - Fusion MPT scsi driver suspend routine.
  *
  *
  */
-int
-mptscsih_suspend(struct pci_dev *pdev, pm_message_t state)
+static int __maybe_unused
+mptscsih_suspend(struct device *dev)
 {
-	MPT_ADAPTER 		*ioc = pci_get_drvdata(pdev);
+	MPT_ADAPTER 		*ioc = dev_get_drvdata(dev);
 
 	scsi_block_requests(ioc->sh);
 	flush_scheduled_work();
-	mptscsih_shutdown(pdev);
-	return mpt_suspend(pdev,state);
+	mptscsih_shutdown(to_pci_dev(dev));
+	return mpt_pm_ops.suspend(dev);
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -1239,18 +1240,19 @@ mptscsih_suspend(struct pci_dev *pdev, pm_message_t state)
  *
  *
  */
-int
-mptscsih_resume(struct pci_dev *pdev)
+static int __maybe_unused
+mptscsih_resume(struct device *dev)
 {
-	MPT_ADAPTER 		*ioc = pci_get_drvdata(pdev);
+	MPT_ADAPTER 		*ioc = dev_get_drvdata(dev);
 	int rc;
 
-	rc = mpt_resume(pdev);
+	rc = mpt_pm_ops.resume(dev);
 	scsi_unblock_requests(ioc->sh);
 	return rc;
 }
 
-#endif
+SIMPLE_DEV_PM_OPS(mptscsih_pm_ops, mptscsih_suspend, mptscsih_resume);
+EXPORT_SYMBOL(mptscsih_pm_ops);
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
@@ -3236,10 +3238,6 @@ EXPORT_SYMBOL(mptscsih_host_attrs);
 
 EXPORT_SYMBOL(mptscsih_remove);
 EXPORT_SYMBOL(mptscsih_shutdown);
-#ifdef CONFIG_PM
-EXPORT_SYMBOL(mptscsih_suspend);
-EXPORT_SYMBOL(mptscsih_resume);
-#endif
 EXPORT_SYMBOL(mptscsih_show_info);
 EXPORT_SYMBOL(mptscsih_info);
 EXPORT_SYMBOL(mptscsih_qcmd);
