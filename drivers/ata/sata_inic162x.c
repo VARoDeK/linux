@@ -793,16 +793,12 @@ static int init_controller(void __iomem *mmio_base, u16 hctl)
 	return 0;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int inic_pci_device_resume(struct pci_dev *pdev)
+static int __maybe_unused inic_pci_device_resume(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
 	struct ata_host *host = pci_get_drvdata(pdev);
 	struct inic_host_priv *hpriv = host->private_data;
 	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 
 	if (pdev->dev.power.power_state.event == PM_EVENT_SUSPEND) {
 		rc = init_controller(hpriv->mmio_base, hpriv->cached_hctl);
@@ -814,7 +810,6 @@ static int inic_pci_device_resume(struct pci_dev *pdev)
 
 	return 0;
 }
-#endif
 
 static int inic_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
@@ -886,13 +881,12 @@ static const struct pci_device_id inic_pci_tbl[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(inic_pci_device_pm_ops, inic_pci_device_resume);
+
 static struct pci_driver inic_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= inic_pci_tbl,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= inic_pci_device_resume,
-#endif
+	.driver.pm	= &inic_pci_device_pm_ops,
 	.probe 		= inic_init_one,
 	.remove		= ata_pci_remove_one,
 };

@@ -216,24 +216,19 @@ static int cs5520_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	return ata_host_register(host, &cs5520_sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
 /**
  *	cs5520_reinit_one	-	device resume
- *	@pdev: PCI device
+ *	@dev: Device
  *
  *	Do any reconfiguration work needed by a resume from RAM. We need
  *	to restore DMA mode support on BIOSen which disabled it
  */
 
-static int cs5520_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused cs5520_reinit_one(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
 	struct ata_host *host = pci_get_drvdata(pdev);
 	u8 pcicfg;
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 
 	pci_read_config_byte(pdev, 0x60, &pcicfg);
 	if ((pcicfg & 0x40) == 0)
@@ -243,29 +238,6 @@ static int cs5520_reinit_one(struct pci_dev *pdev)
 	return 0;
 }
 
-/**
- *	cs5520_pci_device_suspend	-	device suspend
- *	@pdev: PCI device
- *
- *	We have to cut and waste bits from the standard method because
- *	the 5520 is a bit odd and not just a pure ATA device. As a result
- *	we must not disable it. The needed code is short and this avoids
- *	chip specific mess in the core code.
- */
-
-static int cs5520_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg)
-{
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc = 0;
-
-	rc = ata_host_suspend(host, mesg);
-	if (rc)
-		return rc;
-
-	pci_save_state(pdev);
-	return 0;
-}
-#endif /* CONFIG_PM_SLEEP */
 
 /* For now keep DMA off. We can set it for all but A rev CS5510 once the
    core ATA code can handle it */
@@ -277,15 +249,14 @@ static const struct pci_device_id pata_cs5520[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(cs5520_pci_device_pm_ops, cs5520_reinit_one);
+
 static struct pci_driver cs5520_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= pata_cs5520,
 	.probe 		= cs5520_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= cs5520_pci_device_suspend,
-	.resume		= cs5520_reinit_one,
-#endif
+	.driver.pm	= &cs5520_pci_device_pm_ops,
 };
 
 module_pci_driver(cs5520_pci_driver);

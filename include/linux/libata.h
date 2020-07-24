@@ -1104,9 +1104,9 @@ extern int ata_sas_scsi_ioctl(struct ata_port *ap, struct scsi_device *dev,
 			    unsigned int cmd, void __user *arg);
 extern bool ata_link_online(struct ata_link *link);
 extern bool ata_link_offline(struct ata_link *link);
-#ifdef CONFIG_PM
 extern int ata_host_suspend(struct ata_host *host, pm_message_t mesg);
 extern void ata_host_resume(struct ata_host *host);
+#ifdef CONFIG_PM
 extern void ata_sas_port_suspend(struct ata_port *ap);
 extern void ata_sas_port_resume(struct ata_port *ap);
 #else
@@ -1277,12 +1277,30 @@ extern int pci_test_config_bits(struct pci_dev *pdev, const struct pci_bits *bit
 extern void ata_pci_shutdown_one(struct pci_dev *pdev);
 extern void ata_pci_remove_one(struct pci_dev *pdev);
 
-#ifdef CONFIG_PM
-extern void ata_pci_device_do_suspend(struct pci_dev *pdev, pm_message_t mesg);
-extern int __must_check ata_pci_device_do_resume(struct pci_dev *pdev);
-extern int ata_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg);
-extern int ata_pci_device_resume(struct pci_dev *pdev);
-#endif /* CONFIG_PM */
+extern int ata_pci_device_suspend(struct device *dev);
+extern int ata_pci_device_hibernate(struct device *dev);
+extern int ata_pci_device_freeze(struct device *dev);
+extern int ata_pci_device_resume(struct device *dev);
+
+extern const struct dev_pm_ops ata_pci_device_pm_ops;
+
+#ifdef CONFIG_PM_SLEEP
+#define SET_ATA_SLEEP_PM_OPS(resume_fn) \
+	.suspend = ata_pci_device_suspend, \
+	.resume = resume_fn, \
+	.freeze = ata_pci_device_freeze, \
+	.thaw = resume_fn, \
+	.poweroff = ata_pci_device_hibernate, \
+	.restore = resume_fn,
+#else
+#define SET_ATA_SLEEP_PM_OPS(resume_fn)
+#endif
+
+#define ATA_SIMPLE_DEV_PM_OPS(name, resume_fn) \
+const struct dev_pm_ops name = { \
+	SET_ATA_SLEEP_PM_OPS(resume_fn) \
+}
+
 #endif /* CONFIG_PCI */
 
 struct platform_device;

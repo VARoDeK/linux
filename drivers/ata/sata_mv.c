@@ -4299,21 +4299,16 @@ static struct platform_driver mv_platform_driver = {
 #ifdef CONFIG_PCI
 static int mv_pci_init_one(struct pci_dev *pdev,
 			   const struct pci_device_id *ent);
-#ifdef CONFIG_PM_SLEEP
-static int mv_pci_device_resume(struct pci_dev *pdev);
-#endif
+static int __maybe_unused mv_pci_device_resume(struct device *dev);
 
+static ATA_SIMPLE_DEV_PM_OPS(mv_pci_device_pm_ops, mv_pci_device_resume);
 
 static struct pci_driver mv_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= mv_pci_tbl,
 	.probe			= mv_pci_init_one,
 	.remove			= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= ata_pci_device_suspend,
-	.resume			= mv_pci_device_resume,
-#endif
-
+	.driver.pm		= &mv_pci_device_pm_ops,
 };
 
 /**
@@ -4437,15 +4432,10 @@ static int mv_pci_init_one(struct pci_dev *pdev,
 				 IS_GEN_I(hpriv) ? &mv5_sht : &mv6_sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int mv_pci_device_resume(struct pci_dev *pdev)
+static int __maybe_unused mv_pci_device_resume(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
+	struct ata_host *host = dev_get_drvdata(dev);
 	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 
 	/* initialize adapter */
 	rc = mv_init_host(host);
@@ -4456,7 +4446,6 @@ static int mv_pci_device_resume(struct pci_dev *pdev)
 
 	return 0;
 }
-#endif
 #endif
 
 static int __init mv_init(void)

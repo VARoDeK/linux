@@ -61,10 +61,11 @@ static bool acard_ahci_qc_fill_rtf(struct ata_queued_cmd *qc);
 static int acard_ahci_port_start(struct ata_port *ap);
 static int acard_ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
 
-#ifdef CONFIG_PM_SLEEP
-static int acard_ahci_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg);
-static int acard_ahci_pci_device_resume(struct pci_dev *pdev);
-#endif
+static int acard_ahci_pci_device_suspend_late(struct device *dev, pm_message_t mesg);
+static int __maybe_unused acard_ahci_pci_device_suspend(struct device *dev);
+static int __maybe_unused acard_ahci_pci_device_hibernate(struct device *dev);
+static int __maybe_unused acard_ahci_pci_device_freeze(struct device *dev);
+static int __maybe_unused acard_ahci_pci_device_resume(struct device *dev);
 
 static struct scsi_host_template acard_ahci_sht = {
 	AHCI_SHT("acard-ahci"),
@@ -97,28 +98,35 @@ static const struct pci_device_id acard_ahci_pci_tbl[] = {
 	{ }    /* terminate list */
 };
 
+static const struct dev_pm_ops acard_ahci_pci_device_pm_ops = {
+#ifdef CONFIG_PM_SLEEP
+	.suspend	= acard_ahci_pci_device_suspend,
+	.resume		= acard_ahci_pci_device_resume,
+	.freeze		= acard_ahci_pci_device_freeze,
+	.thaw		= acard_ahci_pci_device_resume,
+	.poweroff	= acard_ahci_pci_device_hibernate,
+	.restore	= acard_ahci_pci_device_resume,
+#endif
+};
+
 static struct pci_driver acard_ahci_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= acard_ahci_pci_tbl,
 	.probe			= acard_ahci_init_one,
 	.remove			= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= acard_ahci_pci_device_suspend,
-	.resume			= acard_ahci_pci_device_resume,
-#endif
+	.driver.pm		= &acard_ahci_pci_device_pm_ops,
 };
 
-#ifdef CONFIG_PM_SLEEP
-static int acard_ahci_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg)
+static int acard_ahci_pci_device_suspend_late(struct device *dev, pm_message_t mesg)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
+	struct ata_host *host = dev_get_drvdata(dev);
 	struct ahci_host_priv *hpriv = host->private_data;
 	void __iomem *mmio = hpriv->mmio;
 	u32 ctl;
 
 	if (mesg.event & PM_EVENT_SUSPEND &&
 	    hpriv->flags & AHCI_HFLAG_NO_SUSPEND) {
-		dev_err(&pdev->dev,
+		dev_err(dev,
 			"BIOS update required for suspend/resume\n");
 		return -EIO;
 	}
@@ -134,19 +142,33 @@ static int acard_ahci_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg
 		readl(mmio + HOST_CTL); /* flush */
 	}
 
-	return ata_pci_device_suspend(pdev, mesg);
+	return 0;
 }
 
-static int acard_ahci_pci_device_resume(struct pci_dev *pdev)
+static int __maybe_unused acard_ahci_pci_device_suspend(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
+	acard_ahci_pci_device_suspend_late(dev, PMSG_SUSPEND);
+	return ata_pci_device_suspend(dev);
+}
+
+static int __maybe_unused acard_ahci_pci_device_hibernate(struct device *dev)
+{
+	acard_ahci_pci_device_suspend_late(dev, PMSG_HIBERNATE);
+	return ata_pci_device_hibernate(dev);
+}
+
+static int __maybe_unused acard_ahci_pci_device_freeze(struct device *dev)
+{
+	acard_ahci_pci_device_suspend_late(dev, PMSG_FREEZE);
+	return ata_pci_device_freeze(dev);
+}
+
+static int __maybe_unused acard_ahci_pci_device_resume(struct device *dev)
+{
+	struct ata_host *host = dev_get_drvdata(dev);
 	int rc;
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
-
-	if (pdev->dev.power.power_state.event == PM_EVENT_SUSPEND) {
+	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
 		rc = ahci_reset_controller(host);
 		if (rc)
 			return rc;
@@ -158,7 +180,6 @@ static int acard_ahci_pci_device_resume(struct pci_dev *pdev)
 
 	return 0;
 }
-#endif
 
 static void acard_ahci_pci_print_info(struct ata_host *host)
 {

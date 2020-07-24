@@ -338,22 +338,15 @@ static int sl82c105_init_one(struct pci_dev *dev, const struct pci_device_id *id
 	return ata_pci_bmdma_init_one(dev, ppi, &sl82c105_sht, NULL, 0);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int sl82c105_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused sl82c105_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
-
-	sl82c105_fixup(pdev);
+	sl82c105_fixup(to_pci_dev(dev));
 
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id sl82c105[] = {
 	{ PCI_VDEVICE(WINBOND, PCI_DEVICE_ID_WINBOND_82C105), },
@@ -361,15 +354,14 @@ static const struct pci_device_id sl82c105[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(sl82c105_pci_device_pm_ops, sl82c105_reinit_one);
+
 static struct pci_driver sl82c105_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= sl82c105,
 	.probe 		= sl82c105_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= sl82c105_reinit_one,
-#endif
+	.driver.pm	= &sl82c105_pci_device_pm_ops,
 };
 
 module_pci_driver(sl82c105_pci_driver);

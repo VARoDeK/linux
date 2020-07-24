@@ -303,10 +303,7 @@ static struct pci_driver atiixp_pci_driver = {
 	.id_table	= atiixp,
 	.probe 		= atiixp_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.resume		= ata_pci_device_resume,
-	.suspend	= ata_pci_device_suspend,
-#endif
+	.driver.pm	= &ata_pci_device_pm_ops,
 };
 
 module_pci_driver(atiixp_pci_driver);

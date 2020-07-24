@@ -150,20 +150,14 @@ static int ninja32_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 				 IRQF_SHARED, &ninja32_sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int ninja32_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused ninja32_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 	ninja32_program(host->iomap[0]);
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id ninja32[] = {
 	{ 0x10FC, 0x0003, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
@@ -175,15 +169,14 @@ static const struct pci_device_id ninja32[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(ninja32_pci_device_pm_ops, ninja32_reinit_one);
+
 static struct pci_driver ninja32_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= ninja32,
 	.probe 		= ninja32_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= ninja32_reinit_one,
-#endif
+	.driver.pm	= &ninja32_pci_device_pm_ops,
 };
 
 module_pci_driver(ninja32_pci_driver);

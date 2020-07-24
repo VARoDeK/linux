@@ -152,10 +152,7 @@ static struct pci_driver cy82c693_pci_driver = {
 	.id_table	= cy82c693,
 	.probe 		= cy82c693_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= ata_pci_device_resume,
-#endif
+	.driver.pm	= &ata_pci_device_pm_ops,
 };
 
 module_pci_driver(cy82c693_pci_driver);

@@ -513,22 +513,15 @@ err_out:
 	return rc;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int atp867x_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused atp867x_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
 	atp867x_fixup(host);
 
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static struct pci_device_id atp867x_pci_tbl[] = {
 	{ PCI_VDEVICE(ARTOP, PCI_DEVICE_ID_ARTOP_ATP867A),	0 },
@@ -536,15 +529,14 @@ static struct pci_device_id atp867x_pci_tbl[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(atp867x_pci_device_pm_ops, atp867x_reinit_one);
+
 static struct pci_driver atp867x_driver = {
 	.name 		= DRV_NAME,
 	.id_table 	= atp867x_pci_tbl,
 	.probe 		= atp867x_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= atp867x_reinit_one,
-#endif
+	.driver.pm	= &atp867x_pci_device_pm_ops,
 };
 
 module_pci_driver(atp867x_driver);

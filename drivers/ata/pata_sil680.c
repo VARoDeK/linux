@@ -400,20 +400,15 @@ use_ioports:
 	return ata_pci_bmdma_init_one(pdev, ppi, &sil680_sht, NULL, 0);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int sil680_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused sil680_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int try_mmio, rc;
+	struct ata_host *host = dev_get_drvdata(dev);
+	int try_mmio;
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
-	sil680_init_chip(pdev, &try_mmio);
+	sil680_init_chip(to_pci_dev(dev), &try_mmio);
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id sil680[] = {
 	{ PCI_VDEVICE(CMD, PCI_DEVICE_ID_SII_680), },
@@ -421,15 +416,14 @@ static const struct pci_device_id sil680[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(sil680_pci_device_pm_ops, sil680_reinit_one);
+
 static struct pci_driver sil680_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= sil680,
 	.probe 		= sil680_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= sil680_reinit_one,
-#endif
+	.driver.pm	= &sil680_pci_device_pm_ops,
 };
 
 module_pci_driver(sil680_pci_driver);

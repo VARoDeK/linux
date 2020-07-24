@@ -446,22 +446,15 @@ static int serverworks_init_one(struct pci_dev *pdev, const struct pci_device_id
 	return ata_pci_bmdma_init_one(pdev, ppi, sht, NULL, 0);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int serverworks_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused serverworks_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
-
-	(void)serverworks_fixup(pdev);
+	(void)serverworks_fixup(to_pci_dev(dev));
 
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id serverworks[] = {
 	{ PCI_VDEVICE(SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_OSB4IDE), 0},
@@ -473,15 +466,14 @@ static const struct pci_device_id serverworks[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(serverworks_pci_device_pm_ops, serverworks_reinit_one);
+
 static struct pci_driver serverworks_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= serverworks,
 	.probe 		= serverworks_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= serverworks_reinit_one,
-#endif
+	.driver.pm	= &serverworks_pci_device_pm_ops,
 };
 
 module_pci_driver(serverworks_pci_driver);

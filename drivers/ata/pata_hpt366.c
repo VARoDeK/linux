@@ -384,35 +384,28 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 	return ata_pci_bmdma_init_one(dev, ppi, &hpt36x_sht, (void *)hpriv, 0);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int hpt36x_reinit_one(struct pci_dev *dev)
+static int __maybe_unused hpt36x_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(dev);
-	int rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	rc = ata_pci_device_do_resume(dev);
-	if (rc)
-		return rc;
-	hpt36x_init_chipset(dev);
+	hpt36x_init_chipset(to_pci_dev(dev));
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id hpt36x[] = {
 	{ PCI_VDEVICE(TTI, PCI_DEVICE_ID_TTI_HPT366), },
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(hpt36x_pci_device_pm_ops, hpt36x_reinit_one);
+
 static struct pci_driver hpt36x_pci_driver = {
 	.name		= DRV_NAME,
 	.id_table	= hpt36x,
 	.probe		= hpt36x_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= hpt36x_reinit_one,
-#endif
+	.driver.pm	= &hpt36x_pci_device_pm_ops,
 };
 
 module_pci_driver(hpt36x_pci_driver);

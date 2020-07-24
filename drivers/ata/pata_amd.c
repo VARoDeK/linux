@@ -575,15 +575,10 @@ static int amd_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	return ata_pci_bmdma_init_one(pdev, ppi, &amd_sht, hpriv, 0);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int amd_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused amd_reinit_one(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
 	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 
 	if (pdev->vendor == PCI_VENDOR_ID_AMD) {
 		amd_clear_fifo(pdev);
@@ -594,7 +589,6 @@ static int amd_reinit_one(struct pci_dev *pdev)
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id amd[] = {
 	{ PCI_VDEVICE(AMD,	PCI_DEVICE_ID_AMD_COBRA_7401),		0 },
@@ -622,15 +616,14 @@ static const struct pci_device_id amd[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(amd_pci_device_pm_ops, amd_reinit_one);
+
 static struct pci_driver amd_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= amd,
 	.probe 		= amd_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= amd_reinit_one,
-#endif
+	.driver.pm	= &amd_pci_device_pm_ops,
 };
 
 module_pci_driver(amd_pci_driver);

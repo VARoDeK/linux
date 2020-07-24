@@ -246,22 +246,15 @@ static int hpt3x3_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 				 IRQF_SHARED, &hpt3x3_sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int hpt3x3_reinit_one(struct pci_dev *dev)
+static int __maybe_unused hpt3x3_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(dev);
-	int rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	rc = ata_pci_device_do_resume(dev);
-	if (rc)
-		return rc;
-
-	hpt3x3_init_chipset(dev);
+	hpt3x3_init_chipset(to_pci_dev(dev));
 
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id hpt3x3[] = {
 	{ PCI_VDEVICE(TTI, PCI_DEVICE_ID_TTI_HPT343), },
@@ -269,15 +262,14 @@ static const struct pci_device_id hpt3x3[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(hpt3x3_pci_device_pm_ops, hpt3x3_reinit_one);
+
 static struct pci_driver hpt3x3_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= hpt3x3,
 	.probe 		= hpt3x3_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= hpt3x3_reinit_one,
-#endif
+	.driver.pm	= &hpt3x3_pci_device_pm_ops,
 };
 
 module_pci_driver(hpt3x3_pci_driver);

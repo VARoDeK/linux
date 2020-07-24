@@ -57,9 +57,7 @@ enum {
 };
 
 static int pdc2027x_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
-#ifdef CONFIG_PM_SLEEP
-static int pdc2027x_reinit_one(struct pci_dev *pdev);
-#endif
+static int __maybe_unused pdc2027x_reinit_one(struct device *dev);
 static int pdc2027x_prereset(struct ata_link *link, unsigned long deadline);
 static void pdc2027x_set_piomode(struct ata_port *ap, struct ata_device *adev);
 static void pdc2027x_set_dmamode(struct ata_port *ap, struct ata_device *adev);
@@ -118,15 +116,14 @@ static const struct pci_device_id pdc2027x_pci_tbl[] = {
 	{ }	/* terminate list */
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(pdc2027x_pci_device_pm_ops, pdc2027x_reinit_one);
+
 static struct pci_driver pdc2027x_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= pdc2027x_pci_tbl,
 	.probe			= pdc2027x_init_one,
 	.remove			= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= ata_pci_device_suspend,
-	.resume			= pdc2027x_reinit_one,
-#endif
+	.driver.pm		= &pdc2027x_pci_device_pm_ops,
 };
 
 static struct scsi_host_template pdc2027x_sht = {
@@ -748,16 +745,11 @@ static int pdc2027x_init_one(struct pci_dev *pdev,
 				 IRQF_SHARED, &pdc2027x_sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int pdc2027x_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused pdc2027x_reinit_one(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
 	struct ata_host *host = pci_get_drvdata(pdev);
 	unsigned int board_idx;
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 
 	if (pdev->device == PCI_DEVICE_ID_PROMISE_20268 ||
 	    pdev->device == PCI_DEVICE_ID_PROMISE_20270)
@@ -770,6 +762,5 @@ static int pdc2027x_reinit_one(struct pci_dev *pdev)
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 module_pci_driver(pdc2027x_pci_driver);

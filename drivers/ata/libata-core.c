@@ -5097,6 +5097,7 @@ void ata_sas_port_resume(struct ata_port *ap)
 	ata_port_resume_async(ap, PMSG_RESUME);
 }
 EXPORT_SYMBOL_GPL(ata_sas_port_resume);
+#endif
 
 /**
  *	ata_host_suspend - suspend host
@@ -5123,7 +5124,6 @@ void ata_host_resume(struct ata_host *host)
 	host->dev->power.power_state = PMSG_ON;
 }
 EXPORT_SYMBOL_GPL(ata_host_resume);
-#endif
 
 const struct device_type ata_port_type = {
 	.name = "ata_port",
@@ -6007,63 +6007,54 @@ int pci_test_config_bits(struct pci_dev *pdev, const struct pci_bits *bits)
 }
 EXPORT_SYMBOL_GPL(pci_test_config_bits);
 
-#ifdef CONFIG_PM
-void ata_pci_device_do_suspend(struct pci_dev *pdev, pm_message_t mesg)
+static int ata_pci_device_suspend_late(struct device *dev, pm_message_t mesg)
 {
-	pci_save_state(pdev);
-	pci_disable_device(pdev);
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	if (mesg.event & PM_EVENT_SLEEP)
-		pci_set_power_state(pdev, PCI_D3hot);
+	return ata_host_suspend(host, mesg);
 }
-EXPORT_SYMBOL_GPL(ata_pci_device_do_suspend);
 
-int ata_pci_device_do_resume(struct pci_dev *pdev)
+int ata_pci_device_suspend(struct device *dev)
 {
-	int rc;
-
-	pci_set_power_state(pdev, PCI_D0);
-	pci_restore_state(pdev);
-
-	rc = pcim_enable_device(pdev);
-	if (rc) {
-		dev_err(&pdev->dev,
-			"failed to enable device after resume (%d)\n", rc);
-		return rc;
-	}
-
-	pci_set_master(pdev);
-	return 0;
-}
-EXPORT_SYMBOL_GPL(ata_pci_device_do_resume);
-
-int ata_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg)
-{
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc = 0;
-
-	rc = ata_host_suspend(host, mesg);
-	if (rc)
-		return rc;
-
-	ata_pci_device_do_suspend(pdev, mesg);
-
-	return 0;
+	return ata_pci_device_suspend_late(dev, PMSG_SUSPEND);
 }
 EXPORT_SYMBOL_GPL(ata_pci_device_suspend);
 
-int ata_pci_device_resume(struct pci_dev *pdev)
-{
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc == 0)
-		ata_host_resume(host);
-	return rc;
+int ata_pci_device_hibernate(struct device *dev)
+{
+	return ata_pci_device_suspend_late(dev, PMSG_HIBERNATE);
+}
+EXPORT_SYMBOL_GPL(ata_pci_device_hibernate);
+
+
+int ata_pci_device_freeze(struct device *dev)
+{
+	return ata_pci_device_suspend_late(dev, PMSG_FREEZE);
+}
+EXPORT_SYMBOL_GPL(ata_pci_device_freeze);
+
+int ata_pci_device_resume(struct device *dev)
+{
+	struct ata_host *host = dev_get_drvdata(dev);
+
+	ata_host_resume(host);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(ata_pci_device_resume);
-#endif /* CONFIG_PM */
+
+const struct dev_pm_ops ata_pci_device_pm_ops = {
+#ifdef CONFIG_PM_SLEEP
+	.suspend	= ata_pci_device_suspend,
+	.resume		= ata_pci_device_resume,
+	.freeze		= ata_pci_device_freeze,
+	.thaw		= ata_pci_device_resume,
+	.poweroff	= ata_pci_device_hibernate,
+	.restore	= ata_pci_device_resume,
+#endif
+};
+EXPORT_SYMBOL_GPL(ata_pci_device_pm_ops);
+
 #endif /* CONFIG_PCI */
 
 /**

@@ -279,9 +279,7 @@ struct nv_swncq_port_priv {
 #define NV_ADMA_CHECK_INTR(GCTL, PORT) ((GCTL) & (1 << (19 + (12 * (PORT)))))
 
 static int nv_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
-#ifdef CONFIG_PM_SLEEP
-static int nv_pci_device_resume(struct pci_dev *pdev);
-#endif
+static int __maybe_unused nv_pci_device_resume(struct device *dev);
 static void nv_ck804_host_stop(struct ata_host *host);
 static irqreturn_t nv_generic_interrupt(int irq, void *dev_instance);
 static irqreturn_t nv_nf2_interrupt(int irq, void *dev_instance);
@@ -359,14 +357,13 @@ static const struct pci_device_id nv_pci_tbl[] = {
 	{ } /* terminate list */
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(nv_pci_device_pm_ops, nv_pci_device_resume);
+
 static struct pci_driver nv_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= nv_pci_tbl,
 	.probe			= nv_init_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= ata_pci_device_suspend,
-	.resume			= nv_pci_device_resume,
-#endif
+	.driver.pm		= &nv_pci_device_pm_ops,
 	.remove			= ata_pci_remove_one,
 };
 
@@ -2396,16 +2393,11 @@ static int nv_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	return ata_pci_sff_activate_host(host, ipriv->irq_handler, ipriv->sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int nv_pci_device_resume(struct pci_dev *pdev)
+static int __maybe_unused nv_pci_device_resume(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
 	struct ata_host *host = pci_get_drvdata(pdev);
 	struct nv_host_priv *hpriv = host->private_data;
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 
 	if (pdev->dev.power.power_state.event == PM_EVENT_SUSPEND) {
 		if (hpriv->type >= CK804) {
@@ -2444,7 +2436,6 @@ static int nv_pci_device_resume(struct pci_dev *pdev)
 
 	return 0;
 }
-#endif
 
 static void nv_ck804_host_stop(struct ata_host *host)
 {

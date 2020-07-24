@@ -822,8 +822,7 @@ static bool piix_irq_check(struct ata_port *ap)
 	return ap->ops->bmdma_status(ap) & ATA_DMA_INTR;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int piix_broken_suspend(void)
+static int __maybe_unused piix_broken_suspend(void)
 {
 	static const struct dmi_system_id sysids[] = {
 		{
@@ -983,8 +982,9 @@ static int piix_broken_suspend(void)
 	return 0;
 }
 
-static int piix_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg)
+static int piix_pci_device_suspend_late(struct device *dev, pm_message_t mesg)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
 	struct ata_host *host = pci_get_drvdata(pdev);
 	unsigned long flags;
 	int rc = 0;
@@ -999,8 +999,6 @@ static int piix_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg)
 	 * beauty.
 	 */
 	if (piix_broken_suspend() && (mesg.event & PM_EVENT_SLEEP)) {
-		pci_save_state(pdev);
-
 		/* mark its power state as "unknown", since we don't
 		 * know if e.g. the BIOS will change its device state
 		 * when we suspend.
@@ -1012,44 +1010,41 @@ static int piix_pci_device_suspend(struct pci_dev *pdev, pm_message_t mesg)
 		spin_lock_irqsave(&host->lock, flags);
 		host->flags |= PIIX_HOST_BROKEN_SUSPEND;
 		spin_unlock_irqrestore(&host->lock, flags);
-	} else
-		ata_pci_device_do_suspend(pdev, mesg);
+	}
 
 	return 0;
 }
 
-static int piix_pci_device_resume(struct pci_dev *pdev)
+static int __maybe_unused piix_pci_device_suspend(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
+	return piix_pci_device_suspend_late(dev, PMSG_SUSPEND);
+}
+
+static int __maybe_unused piix_pci_device_hibernate(struct device *dev)
+{
+	return piix_pci_device_suspend_late(dev, PMSG_HIBERNATE);
+}
+
+static int __maybe_unused piix_pci_device_freeze(struct device *dev)
+{
+	return piix_pci_device_suspend_late(dev, PMSG_FREEZE);
+}
+
+static int __maybe_unused piix_pci_device_resume(struct device *dev)
+{
+	struct ata_host *host = dev_get_drvdata(dev);
 	unsigned long flags;
-	int rc;
 
 	if (host->flags & PIIX_HOST_BROKEN_SUSPEND) {
 		spin_lock_irqsave(&host->lock, flags);
 		host->flags &= ~PIIX_HOST_BROKEN_SUSPEND;
 		spin_unlock_irqrestore(&host->lock, flags);
+	}
 
-		pci_set_power_state(pdev, PCI_D0);
-		pci_restore_state(pdev);
+	ata_host_resume(host);
 
-		/* PCI device wasn't disabled during suspend.  Use
-		 * pci_reenable_device() to avoid affecting the enable
-		 * count.
-		 */
-		rc = pci_reenable_device(pdev);
-		if (rc)
-			dev_err(&pdev->dev,
-				"failed to enable device after resume (%d)\n",
-				rc);
-	} else
-		rc = ata_pci_device_do_resume(pdev);
-
-	if (rc == 0)
-		ata_host_resume(host);
-
-	return rc;
+	return 0;
 }
-#endif
 
 static u8 piix_vmw_bmdma_status(struct ata_port *ap)
 {
@@ -1752,15 +1747,23 @@ static void piix_remove_one(struct pci_dev *pdev)
 	ata_pci_remove_one(pdev);
 }
 
+static const struct dev_pm_ops piix_pci_device_pm_ops = {
+#ifdef CONFIG_PM_SLEEP
+	.suspend	= piix_pci_device_suspend,
+	.resume		= piix_pci_device_resume,
+	.freeze		= piix_pci_device_freeze,
+	.thaw		= piix_pci_device_resume,
+	.poweroff	= piix_pci_device_hibernate,
+	.restore	= piix_pci_device_resume,
+#endif
+};
+
 static struct pci_driver piix_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= piix_pci_tbl,
 	.probe			= piix_init_one,
 	.remove			= piix_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= piix_pci_device_suspend,
-	.resume			= piix_pci_device_resume,
-#endif
+	.driver.pm		= &piix_pci_device_pm_ops,
 };
 
 static int __init piix_init(void)

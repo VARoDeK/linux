@@ -96,9 +96,7 @@ enum {
 };
 
 static int sil_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
-#ifdef CONFIG_PM_SLEEP
-static int sil_pci_device_resume(struct pci_dev *pdev);
-#endif
+static int __maybe_unused sil_pci_device_resume(struct device *dev);
 static void sil_dev_config(struct ata_device *dev);
 static int sil_scr_read(struct ata_link *link, unsigned int sc_reg, u32 *val);
 static int sil_scr_write(struct ata_link *link, unsigned int sc_reg, u32 val);
@@ -145,15 +143,14 @@ static const struct sil_drivelist {
 	{ }
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(sil_pci_device_pm_ops, sil_pci_device_resume);
+
 static struct pci_driver sil_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= sil_pci_tbl,
 	.probe			= sil_init_one,
 	.remove			= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= ata_pci_device_suspend,
-	.resume			= sil_pci_device_resume,
-#endif
+	.driver.pm		= &sil_pci_device_pm_ops,
 };
 
 static struct scsi_host_template sil_sht = {
@@ -788,21 +785,14 @@ static int sil_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 				 &sil_sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int sil_pci_device_resume(struct pci_dev *pdev)
+static int __maybe_unused sil_pci_device_resume(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
 	sil_init_controller(host);
 	ata_host_resume(host);
 
 	return 0;
 }
-#endif
 
 module_pci_driver(sil_pci_driver);

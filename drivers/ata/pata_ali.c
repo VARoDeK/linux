@@ -590,20 +590,14 @@ static int ali_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		return ata_pci_bmdma_init_one(pdev, ppi, &ali_sht, NULL, 0);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int ali_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused ali_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
-	ali_init_chipset(pdev);
+	ali_init_chipset(to_pci_dev(dev));
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id ali[] = {
 	{ PCI_VDEVICE(AL, PCI_DEVICE_ID_AL_M5228), },
@@ -612,15 +606,14 @@ static const struct pci_device_id ali[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(ali_pci_device_pm_ops, ali_reinit_one);
+
 static struct pci_driver ali_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= ali,
 	.probe 		= ali_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= ali_reinit_one,
-#endif
+	.driver.pm	= &ali_pci_device_pm_ops,
 };
 
 static int __init ali_init(void)

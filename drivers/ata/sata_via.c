@@ -67,9 +67,7 @@ module_param_named(vt6420_hotplug, vt6420_hotplug, int, 0644);
 MODULE_PARM_DESC(vt6420_hotplug, "Enable hot-plug support for VT6420 (0=Don't support, 1=support)");
 
 static int svia_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
-#ifdef CONFIG_PM_SLEEP
-static int svia_pci_device_resume(struct pci_dev *pdev);
-#endif
+static int __maybe_unused svia_pci_device_resume(struct device *dev);
 static int svia_scr_read(struct ata_link *link, unsigned int sc_reg, u32 *val);
 static int svia_scr_write(struct ata_link *link, unsigned int sc_reg, u32 val);
 static int vt8251_scr_read(struct ata_link *link, unsigned int scr, u32 *val);
@@ -96,14 +94,13 @@ static const struct pci_device_id svia_pci_tbl[] = {
 	{ }	/* terminate list */
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(svia_pci_device_pm_ops, svia_pci_device_resume);
+
 static struct pci_driver svia_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= svia_pci_tbl,
 	.probe			= svia_init_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= ata_pci_device_suspend,
-	.resume			= svia_pci_device_resume,
-#endif
+	.driver.pm		= &svia_pci_device_pm_ops,
 	.remove			= ata_pci_remove_one,
 };
 
@@ -736,23 +733,16 @@ static int svia_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 					 IRQF_SHARED, &svia_sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int svia_pci_device_resume(struct pci_dev *pdev)
+static int __maybe_unused svia_pci_device_resume(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
+	struct ata_host *host = dev_get_drvdata(dev);
 	struct svia_priv *hpriv = host->private_data;
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 
 	if (hpriv->wd_workaround)
-		svia_wd_fix(pdev);
+		svia_wd_fix(to_pci_dev(dev));
 	ata_host_resume(host);
 
 	return 0;
 }
-#endif
 
 module_pci_driver(svia_pci_driver);

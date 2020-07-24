@@ -102,25 +102,18 @@ static int rz1000_init_one (struct pci_dev *pdev, const struct pci_device_id *en
 	return -ENODEV;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int rz1000_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused rz1000_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
 	/* If this fails on resume (which is a "can't happen" case), we
 	   must stop as any progress risks data loss */
-	if (rz1000_fifo_disable(pdev))
+	if (rz1000_fifo_disable(to_pci_dev(dev)))
 		panic("rz1000 fifo");
 
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id pata_rz1000[] = {
 	{ PCI_VDEVICE(PCTECH, PCI_DEVICE_ID_PCTECH_RZ1000), },
@@ -129,15 +122,14 @@ static const struct pci_device_id pata_rz1000[] = {
 	{ },
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(rz1000_pci_device_pm_ops, rz1000_reinit_one);
+
 static struct pci_driver rz1000_pci_driver = {
 	.name 		= DRV_NAME,
 	.id_table	= pata_rz1000,
 	.probe 		= rz1000_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= rz1000_reinit_one,
-#endif
+	.driver.pm	= &rz1000_pci_device_pm_ops,
 };
 
 module_pci_driver(rz1000_pci_driver);

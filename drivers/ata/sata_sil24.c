@@ -343,9 +343,7 @@ static void sil24_error_handler(struct ata_port *ap);
 static void sil24_post_internal_cmd(struct ata_queued_cmd *qc);
 static int sil24_port_start(struct ata_port *ap);
 static int sil24_init_one(struct pci_dev *pdev, const struct pci_device_id *ent);
-#ifdef CONFIG_PM_SLEEP
-static int sil24_pci_device_resume(struct pci_dev *pdev);
-#endif
+static int __maybe_unused sil24_pci_device_resume(struct device *dev);
 #ifdef CONFIG_PM
 static int sil24_port_resume(struct ata_port *ap);
 #endif
@@ -362,15 +360,14 @@ static const struct pci_device_id sil24_pci_tbl[] = {
 	{ } /* terminate list */
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(sil24_pci_device_pm_ops, sil24_pci_device_resume);
+
 static struct pci_driver sil24_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= sil24_pci_tbl,
 	.probe			= sil24_init_one,
 	.remove			= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= ata_pci_device_suspend,
-	.resume			= sil24_pci_device_resume,
-#endif
+	.driver.pm		= &sil24_pci_device_pm_ops,
 };
 
 static struct scsi_host_template sil24_sht = {
@@ -1326,16 +1323,11 @@ static int sil24_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 				 &sil24_sht);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int sil24_pci_device_resume(struct pci_dev *pdev)
+static int __maybe_unused sil24_pci_device_resume(struct device *dev)
 {
+	struct pci_dev *pdev = to_pci_dev(dev);
 	struct ata_host *host = pci_get_drvdata(pdev);
 	void __iomem *host_base = host->iomap[SIL24_HOST_BAR];
-	int rc;
-
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
 
 	if (pdev->dev.power.power_state.event == PM_EVENT_SUSPEND)
 		writel(HOST_CTRL_GLOBAL_RST, host_base + HOST_CTRL);
@@ -1346,7 +1338,6 @@ static int sil24_pci_device_resume(struct pci_dev *pdev)
 
 	return 0;
 }
-#endif
 
 #ifdef CONFIG_PM
 static int sil24_port_resume(struct ata_port *ap)

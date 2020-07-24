@@ -386,32 +386,24 @@ static const struct pci_device_id ns87415_pci_tbl[] = {
 	{ }	/* terminate list */
 };
 
-#ifdef CONFIG_PM_SLEEP
-static int ns87415_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused ns87415_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
-
-	ns87415_fixup(pdev);
+	ns87415_fixup(to_pci_dev(dev));
 
 	ata_host_resume(host);
 	return 0;
 }
-#endif
+
+static ATA_SIMPLE_DEV_PM_OPS(ns87415_pci_device_pm_ops, ns87415_reinit_one);
 
 static struct pci_driver ns87415_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= ns87415_pci_tbl,
 	.probe			= ns87415_init_one,
 	.remove			= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= ata_pci_device_suspend,
-	.resume			= ns87415_reinit_one,
-#endif
+	.driver.pm		= &ns87415_pci_device_pm_ops,
 };
 
 module_pci_driver(ns87415_pci_driver);

@@ -188,10 +188,7 @@ static struct pci_driver cs5535_pci_driver = {
 	.id_table	= cs5535,
 	.probe 		= cs5535_init_one,
 	.remove		= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend	= ata_pci_device_suspend,
-	.resume		= ata_pci_device_resume,
-#endif
+	.driver.pm	= &ata_pci_device_pm_ops,
 };
 
 module_pci_driver(cs5535_pci_driver);

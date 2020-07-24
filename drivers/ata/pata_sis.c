@@ -870,22 +870,15 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	return ata_pci_bmdma_init_one(pdev, ppi, &sis_sht, chipset, 0);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int sis_reinit_one(struct pci_dev *pdev)
+static int __maybe_unused sis_reinit_one(struct device *dev)
 {
-	struct ata_host *host = pci_get_drvdata(pdev);
-	int rc;
+	struct ata_host *host = dev_get_drvdata(dev);
 
-	rc = ata_pci_device_do_resume(pdev);
-	if (rc)
-		return rc;
-
-	sis_fixup(pdev, host->private_data);
+	sis_fixup(to_pci_dev(dev), host->private_data);
 
 	ata_host_resume(host);
 	return 0;
 }
-#endif
 
 static const struct pci_device_id sis_pci_tbl[] = {
 	{ PCI_VDEVICE(SI, 0x5513), },	/* SiS 5513 */
@@ -895,15 +888,14 @@ static const struct pci_device_id sis_pci_tbl[] = {
 	{ }
 };
 
+static ATA_SIMPLE_DEV_PM_OPS(sis_pci_device_pm_ops, sis_reinit_one);
+
 static struct pci_driver sis_pci_driver = {
 	.name			= DRV_NAME,
 	.id_table		= sis_pci_tbl,
 	.probe			= sis_init_one,
 	.remove			= ata_pci_remove_one,
-#ifdef CONFIG_PM_SLEEP
-	.suspend		= ata_pci_device_suspend,
-	.resume			= sis_reinit_one,
-#endif
+	.driver.pm		= &sis_pci_device_pm_ops,
 };
 
 module_pci_driver(sis_pci_driver);
