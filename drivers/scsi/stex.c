@@ -1972,9 +1972,9 @@ static int stex_choice_sleep_mic(struct st_hba *hba, pm_message_t state)
 	}
 }
 
-static int stex_suspend(struct pci_dev *pdev, pm_message_t state)
+static int stex_suspend_late(struct device *dev, pm_message_t state)
 {
-	struct st_hba *hba = pci_get_drvdata(pdev);
+	struct st_hba *hba = dev_get_drvdata(dev);
 
 	if ((hba->cardtype == st_yel || hba->cardtype == st_P3)
 		&& hba->supports_pm == 1)
@@ -1984,9 +1984,24 @@ static int stex_suspend(struct pci_dev *pdev, pm_message_t state)
 	return 0;
 }
 
-static int stex_resume(struct pci_dev *pdev)
+static int __maybe_unused stex_suspend(struct device *dev)
 {
-	struct st_hba *hba = pci_get_drvdata(pdev);
+	return stex_suspend_late(dev, PMSG_SUSPEND);
+}
+
+static int __maybe_unused stex_hibernate(struct device *dev)
+{
+	return stex_suspend_late(dev, PMSG_HIBERNATE);
+}
+
+static int __maybe_unused stex_freeze(struct device *dev)
+{
+	return stex_suspend_late(dev, PMSG_FREEZE);
+}
+
+static int __maybe_unused stex_resume(struct device *dev)
+{
+	struct st_hba *hba = dev_get_drvdata(dev);
 
 	hba->mu_status = MU_STATE_STARTING;
 	stex_handshake(hba);
@@ -2000,14 +2015,24 @@ static int stex_halt(struct notifier_block *nb, unsigned long event, void *buf)
 }
 MODULE_DEVICE_TABLE(pci, stex_pci_tbl);
 
+static const struct dev_pm_ops stex_pm_ops = {
+#ifdef CONFIG_PM_SLEEP
+	.suspend	= stex_suspend,
+	.resume		= stex_resume,
+	.freeze		= stex_freeze,
+	.thaw		= stex_resume,
+	.poweroff	= stex_hibernate,
+	.restore	= stex_resume,
+#endif
+};
+
 static struct pci_driver stex_pci_driver = {
 	.name		= DRV_NAME,
 	.id_table	= stex_pci_tbl,
 	.probe		= stex_probe,
 	.remove		= stex_remove,
 	.shutdown	= stex_shutdown,
-	.suspend	= stex_suspend,
-	.resume		= stex_resume,
+	.driver.pm	= &stex_pm_ops,
 };
 
 static int __init stex_init(void)
