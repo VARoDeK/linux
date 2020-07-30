@@ -8059,11 +8059,11 @@ static void pqi_process_module_params(void)
 	pqi_process_lockup_action_param();
 }
 
-static __maybe_unused int pqi_suspend(struct pci_dev *pci_dev, pm_message_t state)
+static int pqi_suspend_late(struct device *dev, pm_message_t state)
 {
 	struct pqi_ctrl_info *ctrl_info;
 
-	ctrl_info = pci_get_drvdata(pci_dev);
+	ctrl_info = dev_get_drvdata(dev);
 
 	pqi_disable_events(ctrl_info);
 	pqi_cancel_update_time_worker(ctrl_info);
@@ -8081,20 +8081,33 @@ static __maybe_unused int pqi_suspend(struct pci_dev *pci_dev, pm_message_t stat
 	if (state.event == PM_EVENT_FREEZE)
 		return 0;
 
-	pci_save_state(pci_dev);
-	pci_set_power_state(pci_dev, pci_choose_state(pci_dev, state));
-
 	ctrl_info->controller_online = false;
 	ctrl_info->pqi_mode_enabled = false;
 
 	return 0;
 }
 
-static __maybe_unused int pqi_resume(struct pci_dev *pci_dev)
+static __maybe_unused int pqi_suspend(struct device *dev)
+{
+	return pqi_suspend_late(dev, PMSG_SUSPEND);
+}
+
+static __maybe_unused int pqi_hibernate(struct device *dev)
+{
+	return pqi_suspend_late(dev, PMSG_HIBERNATE);
+}
+
+static __maybe_unused int pqi_freeze(struct device *dev)
+{
+	return pqi_suspend_late(dev, PMSG_FREEZE);
+}
+
+static __maybe_unused int pqi_resume(struct device *dev)
 {
 	int rc;
 	struct pqi_ctrl_info *ctrl_info;
 
+	struct pci_dev *pci_dev = to_pci_dev(dev);
 	ctrl_info = pci_get_drvdata(pci_dev);
 
 	if (pci_dev->current_state != PCI_D0) {
@@ -8114,9 +8127,6 @@ static __maybe_unused int pqi_resume(struct pci_dev *pci_dev)
 		pqi_ctrl_unblock_requests(ctrl_info);
 		return 0;
 	}
-
-	pci_set_power_state(pci_dev, PCI_D0);
-	pci_restore_state(pci_dev);
 
 	return pqi_ctrl_init_resume(ctrl_info);
 }
@@ -8480,16 +8490,24 @@ static const struct pci_device_id pqi_pci_id_table[] = {
 
 MODULE_DEVICE_TABLE(pci, pqi_pci_id_table);
 
+static const struct dev_pm_ops pqi_pm_ops = {
+#ifdef CONFIG_PM_SLEEP
+	.suspend = pqi_suspend,
+	.resume = pqi_resume,
+	.freeze = pqi_freeze,
+	.thaw = pqi_resume,
+	.poweroff = pqi_hibernate,
+	.restore = pqi_resume,
+#endif
+};
+
 static struct pci_driver pqi_pci_driver = {
 	.name = DRIVER_NAME_SHORT,
 	.id_table = pqi_pci_id_table,
 	.probe = pqi_pci_probe,
 	.remove = pqi_pci_remove,
 	.shutdown = pqi_shutdown,
-#if defined(CONFIG_PM)
-	.suspend = pqi_suspend,
-	.resume = pqi_resume,
-#endif
+	.driver.pm = &pqi_pm_ops
 };
 
 static int __init pqi_init(void)
