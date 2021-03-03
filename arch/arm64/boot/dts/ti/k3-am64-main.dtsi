@@ -160,6 +160,31 @@
 		};
 	};
 
+	main_crypto: crypto@40900000 {
+		compatible = "ti,am64-sa2ul";
+		reg = <0x0 0x40900000 0x0 0x1200>;
+		power-domains = <&k3_pds 133 TI_SCI_PD_EXCLUSIVE>;
+		clocks = <&k3_clks 133 0>, <&k3_clks 133 1>, <&k3_clks 133 2>;
+		clock-names = "pka_in_clk" , "x1_clk" , "x2_clk";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges = <0x0 0x040900000 0x00 0x040900000 0x0 0x30000>;
+
+		status = "okay";
+
+		dmas = <&main_pktdma 0xc001 15>, <&main_pktdma 0x4002 15>,
+				<&main_pktdma 0x4003 15>;
+		dma-names = "tx", "rx1", "rx2";
+
+		eip76d_rng: rng@40910000 {
+			compatible = "inside-secure,safexcel-eip76";
+			reg = <0x0 0x40910000 0x0 0x80>;
+			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&k3_clks 133 2>;
+			clock-names = "x2_clk";
+		};
+	};
+
 	main_pmx0: pinctrl@f4000 {
 		compatible = "pinctrl-single";
 		reg = <0x00 0xf4000 0x00 0x2d0>;
