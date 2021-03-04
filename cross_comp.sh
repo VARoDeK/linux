@@ -13,7 +13,7 @@ set -e
 
 if [ "$1" == "" ] ;
 then
-	echo "Choose one of: [buildconfig, menuconfig, build, install]"
+	echo "Choose one of: [buildconfig, dt_binding_check, dtbs_check, menuconfig, build, install]"
 	exit 0
 fi
 
@@ -49,6 +49,16 @@ then
 	##echo "menuconfig command"
 	exit 0
 
+elif [ "$1" == "dt_binding_check" ] ;
+then
+	make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- dt_binding_check > \
+	./dt_binding_check.not_patch.patch
+
+elif [ "$1" == "dtbs_check" ] ;
+then
+	make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- dtbs_check > \
+	./dtbs_check.not_patch.patch
+
 elif [ "$1" == "build" ] ;
 then
 	make -j"$(nproc)" W=1 ARCH=arm64 \
@@ -78,7 +88,7 @@ then
 	exit 0
 
 else
-	echo "Choose one of: [buildconfig, menuconfig, build, install]"
+	echo "Choose one of: [buildconfig, dt_binding_check, dtbs_check, menuconfig, build, install]"
 	exit 0
 fi
 
