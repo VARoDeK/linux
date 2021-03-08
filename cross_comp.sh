@@ -52,12 +52,12 @@ then
 elif [ "$1" == "dt_binding_check" ] ;
 then
 	make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- dt_binding_check > \
-	./dt_binding_check.not_patch.patch
+	./dt_binding_check.not_patch.patch 2>&1
 
 elif [ "$1" == "dtbs_check" ] ;
 then
 	make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- dtbs_check > \
-	./dtbs_check.not_patch.patch
+	./dtbs_check.not_patch.patch 2>&1
 
 elif [ "$1" == "build" ] ;
 then
