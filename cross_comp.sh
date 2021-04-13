@@ -45,7 +45,7 @@ then
 elif [ "$1" == "menuconfig" ] ;
 then
 	make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- menuconfig
-	
+
 	##echo "menuconfig command"
 	exit 0
 
@@ -78,10 +78,13 @@ then
 elif [ "$1" == "install" ] ;
 then
 	#Change installation paths according to your own need
+	sudo rm /run/media/varodek/ROOT/boot/Image
 	sudo cp arch/arm64/boot/Image /run/media/varodek/ROOT/boot
 
+	sudo rm /run/media/varodek/ROOT/boot/k3-am642-evm.dtb
 	sudo cp arch/arm64/boot/dts/ti/k3-am642-evm.dtb /run/media/varodek/ROOT/boot
 
+	sudo rm -rf /run/media/varodek/ROOT/lib/modules/*
 	sudo make ARCH=arm64 INSTALL_MOD_PATH=/run/media/varodek/ROOT modules_install
 
 	##echo "install command"
